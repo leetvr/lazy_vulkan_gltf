@@ -1,0 +1,8 @@
+[package]
+name = "lazy_vulkan_gltf"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+glam = "0.30.5"
+gltf = { version = "1.4.1", features = ["names", "utils"] }

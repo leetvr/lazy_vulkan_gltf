@@ -25,7 +25,7 @@ static FRAGMENT_SHADER_PATH: &'static str = "examples/shaders/main.frag.spv";
 struct ModelRenderer {
     pipeline: Pipeline,
     index_buffer: BufferAllocation<u32>,
-    asset: LoadedAsset,
+    assets: Vec<LoadedAsset>,
 }
 
 impl ModelRenderer {
@@ -38,18 +38,22 @@ impl ModelRenderer {
             .allocator
             .allocate_buffer(100_000, vk::BufferUsageFlags::INDEX_BUFFER);
 
-        let asset = lazy_vulkan_gltf::load_asset(
-            "test_assets/bullet.glb",
-            &mut lazy_vulkan.renderer.allocator,
-            &mut lazy_vulkan.renderer.image_manager,
-            &mut index_buffer,
-        )
-        .unwrap();
+        let assets = ["test_assets/bullet.glb", "test_assets/cube.glb"]
+            .map(|path| {
+                lazy_vulkan_gltf::load_asset(
+                    path,
+                    &mut lazy_vulkan.renderer.allocator,
+                    &mut lazy_vulkan.renderer.image_manager,
+                    &mut index_buffer,
+                )
+                .unwrap()
+            })
+            .to_vec();
 
         ModelRenderer {
             pipeline,
             index_buffer,
-            asset,
+            assets,
         }
     }
 }
@@ -67,26 +71,28 @@ impl SubRenderer for ModelRenderer {
 
         let mvp = build_mvp(state, params.drawable.extent);
 
-        for model in &self.asset.meshes {
-            for primitive in &model.primitives {
-                let registers = Registers {
-                    mvp,
-                    vertex_buffer: primitive.vertex_buffer.device_address,
-                    material_buffer: primitive.material,
-                };
-                let device = &context.device;
-                let command_buffer = context.draw_command_buffer;
-                self.pipeline.update_registers(&registers);
+        for asset in &self.assets {
+            for model in &asset.meshes {
+                for primitive in &model.primitives {
+                    let registers = Registers {
+                        mvp,
+                        vertex_buffer: primitive.vertex_buffer.device_address,
+                        material_buffer: primitive.material,
+                    };
+                    let device = &context.device;
+                    let command_buffer = context.draw_command_buffer;
+                    self.pipeline.update_registers(&registers);
 
-                unsafe {
-                    device.cmd_bind_index_buffer(
-                        command_buffer,
-                        self.index_buffer.handle,
-                        primitive.index_buffer_offset,
-                        vk::IndexType::UINT32,
-                    );
-                    device.cmd_draw_indexed(command_buffer, primitive.index_count, 1, 0, 0, 0);
-                };
+                    unsafe {
+                        device.cmd_bind_index_buffer(
+                            command_buffer,
+                            self.index_buffer.handle,
+                            primitive.index_buffer_offset,
+                            vk::IndexType::UINT32,
+                        );
+                        device.cmd_draw_indexed(command_buffer, primitive.index_count, 1, 0, 0, 0);
+                    };
+                }
             }
         }
     }

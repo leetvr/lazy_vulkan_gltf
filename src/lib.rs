@@ -72,7 +72,7 @@ pub struct LoadedMesh {
 #[derive(Clone)]
 pub struct LoadedMaterial {
     pub id: MaterialID,
-    pub material: SlabUpload<Material>,
+    pub material: SlabUpload<GPUMaterial>,
 }
 
 #[derive(Debug, Clone)]
@@ -153,7 +153,6 @@ impl Vertex {
 }
 
 #[derive(Default, Debug, Clone, Copy)]
-#[repr(C)]
 pub struct Material {
     pub id: MaterialID,
     pub base_colour_factor: glam::Vec4,
@@ -163,8 +162,18 @@ pub struct Material {
     pub ao_texture: TextureID, // in the common case this is just the red channel of the MR texture
 }
 
-unsafe impl bytemuck::Zeroable for Material {}
-unsafe impl bytemuck::Pod for Material {}
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(C)]
+pub struct GPUMaterial {
+    pub base_colour_factor: glam::Vec4,
+    pub base_colour_texture: TextureID,
+    pub normal_texture: TextureID,
+    pub metallic_roughness_texture: TextureID,
+    pub ao_texture: TextureID, // in the common case this is just the red channel of the MR texture
+}
+
+unsafe impl bytemuck::Zeroable for GPUMaterial {}
+unsafe impl bytemuck::Pod for GPUMaterial {}
 
 pub fn load_asset(
     path: impl AsRef<Path>,
@@ -307,6 +316,8 @@ fn load_material(
     allocator: &mut Allocator,
     loaded_textures: &HashMap<TextureID, LoadedTexture>,
 ) -> (MaterialID, LoadedMaterial) {
+    let id = material.id;
+
     // First, we want to patch up all the texture references to point to the loaded texture IDs
     let get = |t| {
         loaded_textures
@@ -315,17 +326,16 @@ fn load_material(
             .unwrap_or(NO_TEXTURE.into())
     };
 
-    let material = Material {
+    let material = GPUMaterial {
+        base_colour_factor: material.base_colour_factor,
         base_colour_texture: get(&material.base_colour_texture),
         normal_texture: get(&material.normal_texture),
         metallic_roughness_texture: get(&material.metallic_roughness_texture),
         ao_texture: get(&material.ao_texture),
-        ..*material
     };
 
     // Now let's upload it
     let uploaded = allocator.upload_to_slab(&[material]);
-    let id = material.id;
 
     (
         id,

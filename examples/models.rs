@@ -1,3 +1,6 @@
+use std::f32::consts::TAU;
+
+use glam::Quat;
 use lazy_vulkan::{BufferAllocation, LazyVulkan, Pipeline, SubRenderer, ash::vk};
 use lazy_vulkan_gltf::LoadedAsset;
 use winit::{
@@ -7,10 +10,17 @@ use winit::{
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-struct Registers {}
+struct Registers {
+    mvp: glam::Mat4,
+    vertex_buffer: vk::DeviceAddress,
+    material_buffer: vk::DeviceAddress,
+}
 
 unsafe impl bytemuck::Zeroable for Registers {}
 unsafe impl bytemuck::Pod for Registers {}
+
+static VERTEX_SHADER_PATH: &'static str = "examples/shaders/main.vert.spv";
+static FRAGMENT_SHADER_PATH: &'static str = "examples/shaders/main.frag.spv";
 
 struct ModelRenderer {
     pipeline: Pipeline,
@@ -22,11 +32,11 @@ impl ModelRenderer {
     pub fn new(lazy_vulkan: &mut LazyVulkan) -> Self {
         let pipeline = lazy_vulkan
             .renderer
-            .create_pipeline::<Registers>("shaders/vert.spv", "shaders/frag.spv");
+            .create_pipeline::<Registers>(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH);
         let mut index_buffer = lazy_vulkan
             .renderer
             .allocator
-            .allocate_buffer(100_000, vk::BufferUsageFlags::STORAGE_BUFFER);
+            .allocate_buffer(100_000, vk::BufferUsageFlags::INDEX_BUFFER);
 
         let asset = lazy_vulkan_gltf::load_asset(
             "test_assets/bullet.glb",
@@ -49,15 +59,21 @@ impl SubRenderer for ModelRenderer {
 
     fn draw(
         &mut self,
-        _state: &Self::State,
+        state: &Self::State,
         context: &lazy_vulkan::Context,
-        _params: lazy_vulkan::DrawParams,
+        params: lazy_vulkan::DrawParams,
     ) {
         self.begin_rendering(context, &self.pipeline);
 
+        let mvp = build_mvp(state, params.drawable.extent);
+
         for model in &self.asset.meshes {
             for primitive in &model.primitives {
-                let registers = Registers {};
+                let registers = Registers {
+                    mvp,
+                    vertex_buffer: primitive.vertex_buffer.device_address,
+                    material_buffer: primitive.material,
+                };
                 let device = &context.device;
                 let command_buffer = context.draw_command_buffer;
                 self.pipeline.update_registers(&registers);
@@ -75,9 +91,27 @@ impl SubRenderer for ModelRenderer {
         }
     }
 
-    fn stage_transfers(&mut self, _: &Self::State, _: &mut lazy_vulkan::Allocator) {
-        todo!()
-    }
+    fn stage_transfers(&mut self, _: &Self::State, _: &mut lazy_vulkan::Allocator) {}
+}
+
+fn build_mvp(_state: &RenderState, extent: vk::Extent2D) -> glam::Mat4 {
+    // Build up the perspective matrix
+    let aspect_ratio = extent.width as f32 / extent.height as f32;
+    let mut perspective =
+        glam::Mat4::perspective_infinite_reverse_rh(60_f32.to_radians(), aspect_ratio, 0.01);
+
+    // WULKAN
+    perspective.y_axis *= -1.0;
+
+    // Get view_from_world
+    // TODO: camera
+    let world_from_view = glam::Affine3A::from_rotation_translation(
+        Quat::from_euler(glam::EulerRot::YXZ, TAU * 0.1, -TAU * 0.1, 0.),
+        glam::Vec3::new(4., 4., 4.),
+    );
+    let view_from_world = world_from_view.inverse();
+
+    perspective * view_from_world
 }
 
 #[derive(Default)]
@@ -149,7 +183,28 @@ impl ApplicationHandler for App {
     }
 }
 
+fn compile_shaders() {
+    let _ = std::process::Command::new("glslc")
+        .arg("examples/shaders/main.vert")
+        .arg("-o")
+        .arg(VERTEX_SHADER_PATH)
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+
+    let _ = std::process::Command::new("glslc")
+        .arg("examples/shaders/main.frag")
+        .arg("-o")
+        .arg(FRAGMENT_SHADER_PATH)
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
+}
+
 pub fn main() {
+    compile_shaders();
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
     let mut app = App::default();
     event_loop.run_app(&mut app).unwrap();

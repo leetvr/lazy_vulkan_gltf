@@ -8,7 +8,8 @@ layout(location = 0) out vec4 outColor;
 layout(set = 0, binding = 0) uniform sampler2D textures[];
 
 struct Vertex {
-    vec4 position;
+    vec3 position;
+    vec3 normal;
     vec2 uv;
 };
 
@@ -17,12 +18,26 @@ layout(std430, buffer_reference, buffer_reference_align = 8) readonly buffer Ver
     Vertex vertices[];
 };
 
+struct Material {
+    vec4 baseColourFactor;
+    uint baseColourTextureID;
+    uint normalTextureID;
+    uint metallicRoughnessTextureID;
+    uint aoTextureID;
+};
+
+layout(std430, buffer_reference, buffer_reference_align = 8) readonly buffer MaterialBuffer
+{
+    Material material;
+};
+
 layout(scalar, push_constant) uniform Registers {
     mat4 mvp;
     VertexBuffer vertexBuffer;
-    uint textureId;
+    MaterialBuffer materialBuffer;
 } registers;
 
 void main() {
-    outColor = texture(textures[nonuniformEXT(registers.textureId)], inUV);
+    Material material = registers.materialBuffer.material;
+    outColor = texture(textures[nonuniformEXT(material.baseColourTextureID)], inUV);
 }

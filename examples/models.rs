@@ -36,7 +36,7 @@ impl ModelRenderer {
         let mut index_buffer = lazy_vulkan
             .renderer
             .allocator
-            .allocate_buffer(100_000, vk::BufferUsageFlags::INDEX_BUFFER);
+            .allocate_buffer(8192, vk::BufferUsageFlags::INDEX_BUFFER);
 
         let assets = ["test_assets/bullet.glb", "test_assets/cube.glb"]
             .map(|path| {
@@ -210,8 +210,14 @@ fn compile_shaders() {
 }
 
 pub fn main() {
+    use winit::platform::x11::EventLoopBuilderExtX11;
+
+    env_logger::init();
     compile_shaders();
-    let event_loop = winit::event_loop::EventLoop::new().unwrap();
+    let event_loop = winit::event_loop::EventLoopBuilder::default()
+        .with_x11()
+        .build()
+        .unwrap();
     let mut app = App::default();
     event_loop.run_app(&mut app).unwrap();
 }

@@ -11,6 +11,13 @@ lazy_vulkan = { version = "0.1.0", path = "../lazy_vulkan" }
 png = "0.17.16"
 
 [dev-dependencies]
-winit = { version = "0.30.12", default-features = false, features = [
-    "wayland",
+env_logger = "0.11.8"
+
+[target.'cfg(unix)'.dev-dependencies]
+winit = { version = "0.30", default-features = false, features = [
+    "x11",
+    "rwh_06",
 ] }
+
+[target.'cfg(not(unix))'.dev-dependencies]
+winit = { version = "0.30", default-features = false, features = ["rwh_06"] }

@@ -8,17 +8,6 @@ use winit::{
     window::WindowAttributes,
 };
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct Registers {
-    mvp: glam::Mat4,
-    vertex_buffer: vk::DeviceAddress,
-    material_buffer: vk::DeviceAddress,
-}
-
-unsafe impl bytemuck::Zeroable for Registers {}
-unsafe impl bytemuck::Pod for Registers {}
-
 static VERTEX_SHADER_PATH: &'static str = "examples/shaders/main.vert.spv";
 static FRAGMENT_SHADER_PATH: &'static str = "examples/shaders/main.frag.spv";
 
@@ -26,11 +15,6 @@ struct ModelRenderer {
     pipeline: Pipeline,
     index_buffer: BufferAllocation<u32>,
     models: Vec<Model>,
-}
-
-struct Model {
-    asset: LoadedAsset,
-    position: glam::Vec3,
 }
 
 impl ModelRenderer {
@@ -79,6 +63,8 @@ impl SubRenderer for ModelRenderer {
     ) {
         self.begin_rendering(context, &self.pipeline);
 
+        let device = &context.device;
+        let command_buffer = context.draw_command_buffer;
         let mvp = build_mvp(state, params.drawable.extent);
 
         for model in &self.models {
@@ -89,8 +75,6 @@ impl SubRenderer for ModelRenderer {
                         vertex_buffer: primitive.vertex_buffer.device_address,
                         material_buffer: primitive.material,
                     };
-                    let device = &context.device;
-                    let command_buffer = context.draw_command_buffer;
                     self.pipeline.update_registers(&registers);
 
                     unsafe {
@@ -114,6 +98,22 @@ impl SubRenderer for ModelRenderer {
     }
 }
 
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct Registers {
+    mvp: glam::Mat4,
+    vertex_buffer: vk::DeviceAddress,
+    material_buffer: vk::DeviceAddress,
+}
+
+unsafe impl bytemuck::Zeroable for Registers {}
+unsafe impl bytemuck::Pod for Registers {}
+
+struct Model {
+    asset: LoadedAsset,
+    position: glam::Vec3,
+}
+
 fn build_mvp(_state: &RenderState, extent: vk::Extent2D) -> glam::Mat4 {
     // Build up the perspective matrix
     let aspect_ratio = extent.width as f32 / extent.height as f32;
@@ -133,6 +133,10 @@ fn build_mvp(_state: &RenderState, extent: vk::Extent2D) -> glam::Mat4 {
 
     perspective * view_from_world
 }
+
+// ============
+// BOILERPLATE
+// ============
 
 #[derive(Default)]
 struct RenderState {}

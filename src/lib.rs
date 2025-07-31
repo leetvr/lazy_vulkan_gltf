@@ -60,25 +60,25 @@ impl From<u32> for TextureID {
 
 #[derive(Default, Clone)]
 pub struct LoadedAsset {
-    meshes: Vec<LoadedMesh>,
+    pub meshes: Vec<LoadedMesh>,
 }
 
 #[derive(Default, Clone)]
 pub struct LoadedMesh {
-    id: MeshID,
-    primitives: Vec<LoadedPrimitive>,
+    pub id: MeshID,
+    pub primitives: Vec<LoadedPrimitive>,
 }
 
 #[derive(Clone)]
 pub struct LoadedMaterial {
-    id: MaterialID,
-    material: SlabUpload<Material>,
+    pub id: MaterialID,
+    pub material: SlabUpload<Material>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LoadedTexture {
-    id: TextureID,
-    image: Image,
+    pub id: TextureID,
+    pub image: Image,
 }
 
 impl From<Image> for LoadedTexture {
@@ -91,7 +91,8 @@ impl From<Image> for LoadedTexture {
 #[derive(Clone)]
 pub struct LoadedPrimitive {
     pub id: PrimitiveID,
-    pub index_buffer_offset: u32,
+    pub index_count: u32,
+    pub index_buffer_offset: u64,
     pub vertex_buffer: SlabUpload<Vertex>,
     pub material: vk::DeviceAddress,
 }
@@ -444,7 +445,7 @@ fn load_primitive(
         .device_address;
 
     // Upload the indices
-    let index_buffer_offset = index_buffer.len() as u32;
+    let index_buffer_offset = index_buffer.len() as u64;
     allocator.append_to_buffer(&primitive.indices, index_buffer);
 
     // Upload the vertices
@@ -453,6 +454,7 @@ fn load_primitive(
     LoadedPrimitive {
         id: primitive.id,
         index_buffer_offset,
+        index_count: primitive.indices.len() as u32,
         vertex_buffer,
         material,
     }

@@ -587,6 +587,7 @@ dependencies = [
  "gltf",
  "lazy_vulkan",
  "png",
+ "winit",
 ]
 
 [[package]]

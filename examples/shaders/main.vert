@@ -10,7 +10,7 @@ struct Vertex {
     vec2 uv;
 };
 
-layout(std430, buffer_reference, buffer_reference_align = 8) readonly buffer VertexBuffer
+layout(scalar, buffer_reference, buffer_reference_align = 8) readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
@@ -23,7 +23,7 @@ struct Material {
     uint aoTextureID;
 };
 
-layout(std430, buffer_reference, buffer_reference_align = 8) readonly buffer MaterialBuffer
+layout(scalar, buffer_reference, buffer_reference_align = 8) readonly buffer MaterialBuffer
 {
     Material material;
 };

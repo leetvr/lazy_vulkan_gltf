@@ -25,7 +25,12 @@ static FRAGMENT_SHADER_PATH: &'static str = "examples/shaders/main.frag.spv";
 struct ModelRenderer {
     pipeline: Pipeline,
     index_buffer: BufferAllocation<u32>,
-    assets: Vec<LoadedAsset>,
+    models: Vec<Model>,
+}
+
+struct Model {
+    asset: LoadedAsset,
+    position: glam::Vec3,
 }
 
 impl ModelRenderer {
@@ -38,22 +43,27 @@ impl ModelRenderer {
             .allocator
             .allocate_buffer(8192, vk::BufferUsageFlags::INDEX_BUFFER);
 
-        let assets = ["test_assets/bullet.glb", "test_assets/cube.glb"]
-            .map(|path| {
-                lazy_vulkan_gltf::load_asset(
-                    path,
-                    &mut lazy_vulkan.renderer.allocator,
-                    &mut lazy_vulkan.renderer.image_manager,
-                    &mut index_buffer,
-                )
-                .unwrap()
-            })
-            .to_vec();
+        let models = [
+            ("test_assets/bullet.glb", glam::vec3(4.0, 0.0, 0.)),
+            ("test_assets/cube.glb", glam::Vec3::ZERO),
+        ]
+        .into_iter()
+        .map(|(path, position)| Model {
+            asset: lazy_vulkan_gltf::load_asset(
+                path,
+                &mut lazy_vulkan.renderer.allocator,
+                &mut lazy_vulkan.renderer.image_manager,
+                &mut index_buffer,
+            )
+            .unwrap(),
+            position,
+        })
+        .collect();
 
         ModelRenderer {
             pipeline,
             index_buffer,
-            assets,
+            models,
         }
     }
 }
@@ -71,11 +81,11 @@ impl SubRenderer for ModelRenderer {
 
         let mvp = build_mvp(state, params.drawable.extent);
 
-        for asset in &self.assets {
-            for model in &asset.meshes {
-                for primitive in &model.primitives {
+        for model in &self.models {
+            for mesh in &model.asset.meshes {
+                for primitive in &mesh.primitives {
                     let registers = Registers {
-                        mvp,
+                        mvp: mvp * glam::Affine3A::from_translation(model.position),
                         vertex_buffer: primitive.vertex_buffer.device_address,
                         material_buffer: primitive.material,
                     };
@@ -98,6 +108,10 @@ impl SubRenderer for ModelRenderer {
     }
 
     fn stage_transfers(&mut self, _: &Self::State, _: &mut lazy_vulkan::Allocator) {}
+
+    fn label(&self) -> &'static str {
+        "Mesh Renderer"
+    }
 }
 
 fn build_mvp(_state: &RenderState, extent: vk::Extent2D) -> glam::Mat4 {
@@ -192,6 +206,7 @@ impl ApplicationHandler for App {
 fn compile_shaders() {
     let _ = std::process::Command::new("glslc")
         .arg("examples/shaders/main.vert")
+        .arg("-g")
         .arg("-o")
         .arg(VERTEX_SHADER_PATH)
         .spawn()
@@ -201,6 +216,7 @@ fn compile_shaders() {
 
     let _ = std::process::Command::new("glslc")
         .arg("examples/shaders/main.frag")
+        .arg("-g")
         .arg("-o")
         .arg(FRAGMENT_SHADER_PATH)
         .spawn()

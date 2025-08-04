@@ -11,6 +11,11 @@ use winit::{
 static VERTEX_SHADER_PATH: &'static str = "examples/shaders/main.vert.spv";
 static FRAGMENT_SHADER_PATH: &'static str = "examples/shaders/main.frag.spv";
 
+#[cfg(target_vendor = "apple")]
+static VULKAN_VERSION: &'static str = "vulkan1.2";
+#[cfg(not(target_vendor = "apple"))]
+static VULKAN_VERSION: &'static str = "vulkan1.3";
+
 struct ModelRenderer {
     pipeline: Pipeline,
     index_buffer: BufferAllocation<u32>,
@@ -210,6 +215,7 @@ impl ApplicationHandler for App {
 fn compile_shaders() {
     let _ = std::process::Command::new("glslc")
         .arg("examples/shaders/main.vert")
+        .arg(format!("--target-env={VULKAN_VERSION}"))
         .arg("-g")
         .arg("-o")
         .arg(VERTEX_SHADER_PATH)
@@ -220,6 +226,7 @@ fn compile_shaders() {
 
     let _ = std::process::Command::new("glslc")
         .arg("examples/shaders/main.frag")
+        .arg(format!("--target-env={VULKAN_VERSION}"))
         .arg("-g")
         .arg("-o")
         .arg(FRAGMENT_SHADER_PATH)
@@ -229,6 +236,7 @@ fn compile_shaders() {
         .unwrap();
 }
 
+#[cfg(target_os = "linux")]
 pub fn main() {
     use winit::platform::x11::EventLoopBuilderExtX11;
 
@@ -236,6 +244,17 @@ pub fn main() {
     compile_shaders();
     let event_loop = winit::event_loop::EventLoopBuilder::default()
         .with_x11()
+        .build()
+        .unwrap();
+    let mut app = App::default();
+    event_loop.run_app(&mut app).unwrap();
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn main() {
+    env_logger::init();
+    compile_shaders();
+    let event_loop = winit::event_loop::EventLoopBuilder::default()
         .build()
         .unwrap();
     let mut app = App::default();

@@ -130,8 +130,8 @@ pub struct Texture {
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C)]
 pub struct Vertex {
-    pub position: glam::Vec3,
-    pub normal: glam::Vec3,
+    pub position: glam::Vec4,
+    pub normal: glam::Vec4,
     pub uv: glam::Vec2,
 }
 
@@ -144,9 +144,11 @@ impl Vertex {
         normal: impl Into<glam::Vec3>,
         uv: Option<impl Default + Into<glam::Vec2>>,
     ) -> Vertex {
+        let position = position.into();
+        let normal = normal.into();
         Vertex {
-            position: position.into(),
-            normal: normal.into(),
+            position: position.extend(1.0),
+            normal: normal.extend(1.0),
             uv: uv.unwrap_or_default().into(),
         }
     }

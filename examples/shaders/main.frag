@@ -1,4 +1,4 @@
-#version 450
+#version 460
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_scalar_block_layout : require
@@ -10,12 +10,12 @@ layout(location = 0) out vec4 outColor;
 layout(set = 0, binding = 0) uniform sampler2D textures[];
 
 struct Vertex {
-    vec3 position;
-    vec3 normal;
+    vec4 position;
+    vec4 normal;
     vec2 uv;
 };
 
-layout(scalar, buffer_reference, buffer_reference_align = 8) readonly buffer VertexBuffer
+layout(std430, buffer_reference, buffer_reference_align = 16) readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
@@ -28,7 +28,7 @@ struct Material {
     uint aoTextureID;
 };
 
-layout(scalar, buffer_reference, buffer_reference_align = 8) readonly buffer MaterialBuffer
+layout(scalar, buffer_reference, buffer_reference_align = 16) readonly buffer MaterialBuffer
 {
     Material material;
 };

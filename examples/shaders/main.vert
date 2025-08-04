@@ -1,16 +1,16 @@
-#version 450
+#version 460
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_scalar_block_layout : require
 
 layout(location = 0) out vec2 outUV;
 
 struct Vertex {
-    vec3 position;
-    vec3 normal;
+    vec4 position;
+    vec4 normal;
     vec2 uv;
 };
 
-layout(scalar, buffer_reference, buffer_reference_align = 8) readonly buffer VertexBuffer
+layout(std430, buffer_reference, buffer_reference_align = 16) readonly buffer VertexBuffer
 {
     Vertex vertices[];
 };
@@ -23,7 +23,7 @@ struct Material {
     uint aoTextureID;
 };
 
-layout(scalar, buffer_reference, buffer_reference_align = 8) readonly buffer MaterialBuffer
+layout(scalar, buffer_reference, buffer_reference_align = 16) readonly buffer MaterialBuffer
 {
     Material material;
 };
@@ -36,6 +36,6 @@ layout(scalar, push_constant) uniform Registers {
 
 void main() {
     Vertex vertex = registers.vertexBuffer.vertices[gl_VertexIndex];
-    gl_Position = registers.mvp * vec4(vertex.position, 1.0);
+    gl_Position = registers.mvp * vertex.position;
     outUV = vertex.uv;
 }

@@ -60,7 +60,7 @@ impl ModelRenderer {
 impl SubRenderer for ModelRenderer {
     type State = RenderState;
 
-    fn draw(
+    fn draw_opaque(
         &mut self,
         state: &Self::State,
         context: &lazy_vulkan::Context,
@@ -95,8 +95,6 @@ impl SubRenderer for ModelRenderer {
             }
         }
     }
-
-    fn stage_transfers(&mut self, _: &Self::State, _: &mut lazy_vulkan::Allocator) {}
 
     fn label(&self) -> &'static str {
         "Mesh Renderer"

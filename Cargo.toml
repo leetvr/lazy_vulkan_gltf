@@ -7,7 +7,7 @@ edition = "2024"
 bytemuck = "1.23.1"
 glam = "0.30.5"
 gltf = { version = "1.4.1", features = ["names", "utils"] }
-lazy_vulkan = { version = "0.1.0", git = "https://github.com/leetvr/lazy_vulkan", rev = "f17d0cf" }
+lazy_vulkan.path = "../lazy_vulkan"
 png = "0.17.16"
 
 [dev-dependencies]

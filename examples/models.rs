@@ -18,12 +18,10 @@ struct ModelRenderer {
 }
 
 impl ModelRenderer {
-    pub fn new(lazy_vulkan: &mut LazyVulkan) -> Self {
-        let pipeline = lazy_vulkan
-            .renderer
-            .create_pipeline::<Registers>(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH);
-        let mut index_buffer = lazy_vulkan
-            .renderer
+    pub fn new(renderer: &mut lazy_vulkan::Renderer<()>) -> Self {
+        let pipeline =
+            renderer.create_pipeline::<Registers>(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH);
+        let mut index_buffer = renderer
             .allocator
             .allocate_buffer(8192, vk::BufferUsageFlags::INDEX_BUFFER);
 
@@ -35,8 +33,8 @@ impl ModelRenderer {
         .map(|(path, position)| Model {
             asset: lazy_vulkan_gltf::load_asset(
                 path,
-                &mut lazy_vulkan.renderer.allocator,
-                &mut lazy_vulkan.renderer.image_manager,
+                &mut renderer.allocator,
+                &mut renderer.image_manager,
                 &mut index_buffer,
             )
             .unwrap(),
@@ -52,12 +50,12 @@ impl ModelRenderer {
     }
 }
 
-impl SubRenderer for ModelRenderer {
-    type State = RenderState;
+impl SubRenderer<'_> for ModelRenderer {
+    type State = ();
 
-    fn draw(
+    fn draw_opaque(
         &mut self,
-        state: &Self::State,
+        _state: &Self::State,
         context: &lazy_vulkan::Context,
         params: lazy_vulkan::DrawParams,
     ) {
@@ -65,7 +63,7 @@ impl SubRenderer for ModelRenderer {
 
         let device = &context.device;
         let command_buffer = context.draw_command_buffer;
-        let mvp = build_mvp(state, params.drawable.extent);
+        let mvp = build_mvp(params.drawable.extent);
 
         for model in &self.models {
             for mesh in &model.asset.meshes {
@@ -91,8 +89,6 @@ impl SubRenderer for ModelRenderer {
         }
     }
 
-    fn stage_transfers(&mut self, _: &Self::State, _: &mut lazy_vulkan::Allocator) {}
-
     fn label(&self) -> &'static str {
         "Mesh Renderer"
     }
@@ -114,7 +110,7 @@ struct Model {
     position: glam::Vec3,
 }
 
-fn build_mvp(_state: &RenderState, extent: vk::Extent2D) -> glam::Mat4 {
+fn build_mvp(extent: vk::Extent2D) -> glam::Mat4 {
     // Build up the perspective matrix
     let aspect_ratio = extent.width as f32 / extent.height as f32;
     let mut perspective =
@@ -138,14 +134,9 @@ fn build_mvp(_state: &RenderState, extent: vk::Extent2D) -> glam::Mat4 {
 // BOILERPLATE
 // ============
 
-#[derive(Default)]
-struct RenderState {}
-
 struct AppState {
     window: winit::window::Window,
-    lazy_vulkan: LazyVulkan,
-    sub_renderers: Vec<Box<dyn SubRenderer<State = RenderState>>>,
-    render_state: RenderState,
+    lazy_vulkan: LazyVulkan<()>,
 }
 
 #[derive(Default)]
@@ -165,13 +156,12 @@ impl ApplicationHandler for App {
 
         let mut lazy_vulkan = LazyVulkan::from_window(&window);
 
-        let sub_renderers = vec![Box::new(ModelRenderer::new(&mut lazy_vulkan)) as _];
+        let model_renderer = ModelRenderer::new(&mut lazy_vulkan.renderer);
+        lazy_vulkan.add_sub_renderer(Box::new(model_renderer));
 
         self.state = Some(AppState {
             window,
             lazy_vulkan,
-            sub_renderers,
-            render_state: Default::default(),
         });
     }
 
@@ -190,9 +180,7 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
-                state
-                    .lazy_vulkan
-                    .draw(&state.render_state, &mut state.sub_renderers);
+                state.lazy_vulkan.draw(&());
             }
             _ => {}
         }

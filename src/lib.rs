@@ -368,10 +368,13 @@ fn get_texture(
     let mut decoder = png::Decoder::new(image_data);
     decoder.set_transformations(png::Transformations::ALPHA);
     let mut reader = decoder.read_info().unwrap();
+
     // Allocate the output buffer.
     let mut buf = vec![0; reader.output_buffer_size()];
+
     // Read the next frame. An APNG might contain multiple frames.
     let info = reader.next_frame(&mut buf).unwrap();
+
     // Grab the bytes of the image.
     let data = buf[..info.buffer_size()].to_vec();
 
@@ -472,6 +475,8 @@ fn load_primitive(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use lazy_vulkan::ash::vk;
 
     use super::get_asset;
@@ -490,7 +495,14 @@ mod tests {
 
     #[test]
     fn test_load_asset() {
-        let mut lazy_vulkan = lazy_vulkan::LazyVulkan::headless();
+        let core = Arc::new(lazy_vulkan::Core::headless());
+        let context = Arc::new(lazy_vulkan::Context::new_headless(&core));
+        let mut lazy_vulkan: lazy_vulkan::LazyVulkan<()> = lazy_vulkan::LazyVulkan::headless(
+            core,
+            context,
+            vk::Extent2D::default(),
+            vk::Format::R8G8B8A8_UNORM,
+        );
         let mut index_buffer = lazy_vulkan
             .renderer
             .allocator

@@ -2,7 +2,7 @@ use std::f32::consts::TAU;
 
 use glam::Quat;
 use lazy_vulkan::{BufferAllocation, LazyVulkan, Pipeline, SubRenderer, ash::vk};
-use lazy_vulkan_gltf::LoadedAsset;
+use lazy_vulkan_gltf::{LoadedAsset, Vertex};
 use winit::{
     application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent,
     window::WindowAttributes,
@@ -13,6 +13,7 @@ static FRAGMENT_SHADER_PATH: &'static str = "examples/shaders/main.frag.spv";
 
 struct ModelRenderer {
     pipeline: Pipeline,
+    vertex_buffer: BufferAllocation<Vertex>,
     index_buffer: BufferAllocation<u32>,
     models: Vec<Model>,
 }
@@ -21,6 +22,10 @@ impl ModelRenderer {
     pub fn new(renderer: &mut lazy_vulkan::Renderer<()>) -> Self {
         let pipeline =
             renderer.create_pipeline::<Registers>(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH);
+        let mut vertex_buffer = renderer
+            .allocator
+            .allocate_buffer(1024 * 1024, vk::BufferUsageFlags::STORAGE_BUFFER);
+
         let mut index_buffer = renderer
             .allocator
             .allocate_buffer(8192, vk::BufferUsageFlags::INDEX_BUFFER);
@@ -35,6 +40,7 @@ impl ModelRenderer {
                 path,
                 &mut renderer.allocator,
                 &mut renderer.image_manager,
+                &mut vertex_buffer,
                 &mut index_buffer,
             )
             .unwrap(),
@@ -44,6 +50,7 @@ impl ModelRenderer {
 
         ModelRenderer {
             pipeline,
+            vertex_buffer,
             index_buffer,
             models,
         }
@@ -68,11 +75,14 @@ impl SubRenderer<'_> for ModelRenderer {
         for model in &self.models {
             for mesh in &model.asset.meshes {
                 for primitive in &mesh.primitives {
+                    let vertex_buffer =
+                        self.vertex_buffer.device_address + primitive.vertex_buffer_offset;
                     let registers = Registers {
                         mvp: mvp * glam::Affine3A::from_translation(model.position),
-                        vertex_buffer: primitive.vertex_buffer.device_address,
+                        vertex_buffer,
                         material_buffer: primitive.material,
                     };
+
                     self.pipeline.update_registers(&registers);
 
                     unsafe {

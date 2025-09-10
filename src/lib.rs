@@ -31,6 +31,12 @@ impl From<usize> for PrimitiveID {
     }
 }
 
+impl std::fmt::Display for PrimitiveID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Hash)]
 pub struct TextureID(u32);
 
@@ -93,7 +99,7 @@ pub struct LoadedPrimitive {
     pub id: PrimitiveID,
     pub index_count: u32,
     pub index_buffer_offset: u64,
-    pub vertex_buffer: SlabUpload<Vertex>,
+    pub vertex_buffer_offset: u64,
     pub material: vk::DeviceAddress,
 }
 
@@ -179,6 +185,7 @@ pub fn load_asset(
     path: impl AsRef<Path>,
     allocator: &mut Allocator,
     image_manager: &mut ImageManager,
+    vertex_buffer: &mut BufferAllocation<Vertex>,
     index_buffer: &mut BufferAllocation<u32>,
 ) -> Result<LoadedAsset, gltf::Error> {
     let asset = get_asset(path)?;
@@ -201,7 +208,7 @@ pub fn load_asset(
     let meshes = asset
         .meshes
         .iter()
-        .map(|m| load_mesh(m, allocator, index_buffer, &loaded_materials))
+        .map(|m| load_mesh(m, allocator, vertex_buffer, index_buffer, &loaded_materials))
         .collect();
 
     Ok(LoadedAsset { meshes })
@@ -241,13 +248,14 @@ fn get_mesh(mesh: gltf::Mesh, blob: &[u8]) -> Mesh {
 fn load_mesh(
     mesh: &Mesh,
     allocator: &mut Allocator,
+    vertex_buffer: &mut BufferAllocation<Vertex>,
     index_buffer: &mut BufferAllocation<u32>,
     loaded_materials: &HashMap<MaterialID, LoadedMaterial>,
 ) -> LoadedMesh {
     let primitives = mesh
         .primitives
         .iter()
-        .map(|p| load_primitive(p, allocator, index_buffer, loaded_materials))
+        .map(|p| load_primitive(p, allocator, vertex_buffer, index_buffer, loaded_materials))
         .collect();
 
     LoadedMesh {
@@ -447,6 +455,7 @@ fn get_primitive(primitive: gltf::Primitive, blob: &[u8]) -> Option<Primitive> {
 fn load_primitive(
     primitive: &Primitive,
     allocator: &mut Allocator,
+    vertex_buffer: &mut BufferAllocation<Vertex>,
     index_buffer: &mut BufferAllocation<u32>,
     loaded_materials: &HashMap<MaterialID, LoadedMaterial>,
 ) -> LoadedPrimitive {
@@ -461,14 +470,33 @@ fn load_primitive(
     let index_buffer_offset = index_buffer.len() as u64;
     allocator.append_to_buffer(&primitive.indices, index_buffer);
 
-    // Upload the vertices
-    let vertex_buffer = allocator.upload_to_slab(&primitive.vertices);
+    println!(
+        "[Primitive#{}] Wrote {} indices to [index buffer (device address: {})] at offset {}. First index: {:?}",
+        primitive.id,
+        primitive.indices.len(),
+        index_buffer.device_address,
+        index_buffer_offset,
+        primitive.indices.first().as_ref().unwrap(),
+    );
+
+    // Upload the indices
+    let vertex_buffer_offset = vertex_buffer.len() as u64;
+    allocator.append_to_buffer(&primitive.vertices, vertex_buffer);
+
+    println!(
+        "[Primitive#{}] Wrote {} vertices to [vertex buffer (device address: {})] at offset {}. First vertex: {:?}",
+        primitive.id,
+        primitive.vertices.len(),
+        vertex_buffer.device_address,
+        vertex_buffer_offset,
+        primitive.vertices.first().as_ref().unwrap(),
+    );
 
     LoadedPrimitive {
         id: primitive.id,
         index_buffer_offset,
         index_count: primitive.indices.len() as u32,
-        vertex_buffer,
+        vertex_buffer_offset,
         material,
     }
 }
@@ -503,6 +531,10 @@ mod tests {
             vk::Extent2D::default(),
             vk::Format::R8G8B8A8_UNORM,
         );
+        let mut vertex_buffer = lazy_vulkan
+            .renderer
+            .allocator
+            .allocate_buffer(100_000, vk::BufferUsageFlags::STORAGE_BUFFER);
         let mut index_buffer = lazy_vulkan
             .renderer
             .allocator
@@ -512,6 +544,7 @@ mod tests {
             "test_assets/cube.glb",
             &mut lazy_vulkan.renderer.allocator,
             &mut lazy_vulkan.renderer.image_manager,
+            &mut vertex_buffer,
             &mut index_buffer,
         )
         .unwrap();

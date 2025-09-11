@@ -22,12 +22,39 @@ impl From<usize> for MeshID {
     }
 }
 
+impl From<MeshID> for usize {
+    fn from(value: MeshID) -> Self {
+        value.0 as usize
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Eq, Copy, Hash)]
+pub struct NodeID(u32);
+
+impl From<usize> for NodeID {
+    fn from(value: usize) -> Self {
+        NodeID(value as u32)
+    }
+}
+
+impl From<NodeID> for usize {
+    fn from(value: NodeID) -> Self {
+        value.0 as usize
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq, Eq, Copy, Hash)]
 pub struct PrimitiveID(u32);
 
 impl From<usize> for PrimitiveID {
     fn from(value: usize) -> Self {
         PrimitiveID(value as u32)
+    }
+}
+
+impl From<PrimitiveID> for u32 {
+    fn from(value: PrimitiveID) -> Self {
+        value.0
     }
 }
 
@@ -67,6 +94,7 @@ impl From<u32> for TextureID {
 #[derive(Default, Clone)]
 pub struct LoadedAsset {
     pub meshes: Vec<LoadedMesh>,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Default, Clone)]
@@ -98,6 +126,7 @@ impl From<Image> for LoadedTexture {
 pub struct LoadedPrimitive {
     pub id: PrimitiveID,
     pub index_count: u32,
+    pub vertex_count: u32,
     pub index_buffer_offset: u64,
     pub vertex_buffer_offset: u64,
     pub material: vk::DeviceAddress,
@@ -108,6 +137,15 @@ pub struct Asset {
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
     pub textures: Vec<Texture>,
+    pub nodes: Vec<Node>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct Node {
+    pub id: NodeID,
+    pub mesh_id: MeshID,
+    pub children: Vec<NodeID>,
+    pub transform: glam::Affine3A,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -211,15 +249,16 @@ pub fn load_asset(
         .map(|m| load_mesh(m, allocator, vertex_buffer, index_buffer, &loaded_materials))
         .collect();
 
-    Ok(LoadedAsset { meshes })
+    Ok(LoadedAsset {
+        meshes,
+        nodes: asset.nodes,
+    })
 }
 
 pub fn get_asset(path: impl AsRef<Path>) -> Result<Asset, gltf::Error> {
+    let path = path.as_ref();
     let gltf::Gltf { document, blob } = gltf::Gltf::open(path)?;
-    let Some(blob) = blob else {
-        // We only support GLB files
-        return Err(gltf::Error::MissingBlob);
-    };
+    let blob = blob.unwrap_or_else(|| get_buffer(path, &document));
 
     let meshes = document.meshes().map(|m| get_mesh(m, &blob)).collect();
     let mut textures = vec![];
@@ -227,12 +266,60 @@ pub fn get_asset(path: impl AsRef<Path>) -> Result<Asset, gltf::Error> {
         .materials()
         .filter_map(|m| get_material(m, &mut textures, &blob))
         .collect();
+    let nodes = document.nodes().filter_map(|n| get_node(n)).collect();
 
     Ok(Asset {
         meshes,
         materials,
         textures,
+        nodes,
     })
+}
+
+fn get_node(n: gltf::Node) -> Option<Node> {
+    let mesh_id = n.mesh()?.index().into();
+    let id = n.index().into();
+    let transform = convert_transform(n.transform());
+    let children = n.children().map(|c| c.index().into()).collect();
+
+    Some(Node {
+        id,
+        mesh_id,
+        children,
+        transform,
+    })
+}
+
+fn convert_transform(transform: gltf::scene::Transform) -> glam::Affine3A {
+    match transform {
+        gltf::scene::Transform::Matrix { matrix } => {
+            glam::Affine3A::from_mat4(glam::Mat4::from_cols_array_2d(&matrix))
+        }
+        gltf::scene::Transform::Decomposed {
+            translation,
+            rotation,
+            scale,
+        } => glam::Affine3A::from_scale_rotation_translation(
+            scale.into(),
+            glam::Quat::from_array(rotation),
+            translation.into(),
+        ),
+    }
+}
+
+fn get_buffer(path: &std::path::Path, document: &gltf::Document) -> Vec<u8> {
+    let gltf::buffer::Source::Uri(uri) = document
+        .buffers()
+        .next()
+        .expect("No buffers? Impossible")
+        .source()
+    else {
+        panic!("No buffers? Impossible");
+    };
+
+    let mut path = path.to_path_buf();
+    path.set_file_name(uri);
+    std::fs::read(&path).expect(&format!("Failed to load {path:?} for buffer"))
 }
 
 fn get_mesh(mesh: gltf::Mesh, blob: &[u8]) -> Mesh {
@@ -496,6 +583,7 @@ fn load_primitive(
         id: primitive.id,
         index_buffer_offset,
         index_count: primitive.indices.len() as u32,
+        vertex_count: primitive.vertices.len() as u32,
         vertex_buffer_offset,
         material,
     }
@@ -518,6 +606,17 @@ mod tests {
         assert_eq!(asset.meshes[0].primitives[0].indices.len(), 2916);
         assert_eq!(asset.meshes[0].primitives[0].vertices.len(), 681);
         assert_eq!(asset.materials.len(), 1);
+        assert_eq!(asset.textures.len(), 0);
+    }
+
+    #[test]
+    fn test_get_asset_gltf() {
+        let asset = get_asset("test_assets/cornellBox.gltf").unwrap();
+        assert_eq!(asset.meshes.len(), 9);
+        assert_eq!(asset.meshes[0].primitives.len(), 1);
+        assert_eq!(asset.meshes[0].primitives[0].indices.len(), 36);
+        assert_eq!(asset.meshes[0].primitives[0].vertices.len(), 24);
+        assert_eq!(asset.materials.len(), 9);
         assert_eq!(asset.textures.len(), 0);
     }
 

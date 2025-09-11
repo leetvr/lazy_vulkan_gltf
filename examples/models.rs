@@ -24,15 +24,16 @@ impl ModelRenderer {
             renderer.create_pipeline::<Registers>(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH);
         let mut vertex_buffer = renderer
             .allocator
-            .allocate_buffer(1024 * 1024, vk::BufferUsageFlags::STORAGE_BUFFER);
+            .allocate_buffer(10 * 1024 * 1024, vk::BufferUsageFlags::STORAGE_BUFFER);
 
         let mut index_buffer = renderer
             .allocator
-            .allocate_buffer(8192, vk::BufferUsageFlags::INDEX_BUFFER);
+            .allocate_buffer(1024 * 1024, vk::BufferUsageFlags::INDEX_BUFFER);
 
         let models = [
             ("test_assets/bullet.glb", glam::vec3(4.0, 0.0, 0.)),
             ("test_assets/cube.glb", glam::Vec3::ZERO),
+            ("test_assets/cornellBox.gltf", glam::Vec3::ZERO),
         ]
         .into_iter()
         .map(|(path, position)| Model {
@@ -73,12 +74,19 @@ impl SubRenderer<'_> for ModelRenderer {
         let mvp = build_mvp(params.drawable.extent);
 
         for model in &self.models {
-            for mesh in &model.asset.meshes {
+            for node in &model.asset.nodes {
+                let mesh = &model.asset.meshes[usize::from(node.mesh_id)];
                 for primitive in &mesh.primitives {
                     let vertex_buffer =
                         self.vertex_buffer.device_address + primitive.vertex_buffer_offset;
+
                     let registers = Registers {
-                        mvp: mvp * glam::Affine3A::from_translation(model.position),
+                        mvp: mvp
+                            * glam::Affine3A::from_rotation_translation(
+                                glam::Quat::IDENTITY,
+                                model.position,
+                            )
+                            * node.transform,
                         vertex_buffer,
                         material_buffer: primitive.material,
                     };

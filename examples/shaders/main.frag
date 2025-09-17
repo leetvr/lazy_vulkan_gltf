@@ -22,6 +22,7 @@ layout(scalar, buffer_reference, buffer_reference_align = 8) readonly buffer Ver
 
 struct Material {
     vec4 baseColourFactor;
+    vec3 emissiveFactor;
     uint baseColourTextureID;
     uint normalTextureID;
     uint metallicRoughnessTextureID;

@@ -33,7 +33,6 @@ impl ModelRenderer {
         let models = [
             ("test_assets/bullet.glb", glam::vec3(4.0, 0.0, 0.)),
             ("test_assets/cube.glb", glam::Vec3::ZERO),
-            ("test_assets/cornellBox.gltf", glam::Vec3::ZERO),
         ]
         .into_iter()
         .map(|(path, position)| Model {
@@ -41,8 +40,8 @@ impl ModelRenderer {
                 path,
                 &mut renderer.allocator,
                 &mut renderer.image_manager,
-                &mut vertex_buffer,
                 &mut index_buffer,
+                &mut vertex_buffer,
             )
             .unwrap(),
             position,

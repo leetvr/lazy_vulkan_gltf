@@ -1,4 +1,9 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    path::Path,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use lazy_vulkan::{Allocator, BufferAllocation, Image, ImageManager, SlabUpload, ash::vk};
 
@@ -28,6 +33,12 @@ impl From<MeshID> for usize {
     }
 }
 
+impl Display for MeshID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq, Eq, Copy, Hash)]
 pub struct NodeID(u32);
 
@@ -43,8 +54,21 @@ impl From<NodeID> for usize {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Copy, Hash)]
+impl Display for NodeID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Eq, Copy, Hash, PartialOrd, Ord)]
 pub struct PrimitiveID(u32);
+impl PrimitiveID {
+    fn next() -> PrimitiveID {
+        PrimitiveID(NEXT_PRIMITIVE_ID.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
+static NEXT_PRIMITIVE_ID: AtomicU32 = AtomicU32::new(0);
 
 impl From<usize> for PrimitiveID {
     fn from(value: usize) -> Self {
@@ -58,7 +82,7 @@ impl From<PrimitiveID> for u32 {
     }
 }
 
-impl std::fmt::Display for PrimitiveID {
+impl Display for PrimitiveID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
@@ -200,6 +224,7 @@ impl Vertex {
 pub struct Material {
     pub id: MaterialID,
     pub base_colour_factor: glam::Vec4,
+    pub emissive_colour_factor: glam::Vec3,
     pub base_colour_texture: TextureID,
     pub normal_texture: TextureID,
     pub metallic_roughness_texture: TextureID,
@@ -210,6 +235,7 @@ pub struct Material {
 #[repr(C)]
 pub struct GPUMaterial {
     pub base_colour_factor: glam::Vec4,
+    pub emissive_colour_factor: glam::Vec3,
     pub base_colour_texture: TextureID,
     pub normal_texture: TextureID,
     pub metallic_roughness_texture: TextureID,
@@ -223,8 +249,8 @@ pub fn load_asset(
     path: impl AsRef<Path>,
     allocator: &mut Allocator,
     image_manager: &mut ImageManager,
-    vertex_buffer: &mut BufferAllocation<Vertex>,
     index_buffer: &mut BufferAllocation<u32>,
+    vertex_buffer: &mut BufferAllocation<Vertex>,
 ) -> Result<LoadedAsset, gltf::Error> {
     let asset = get_asset(path)?;
 
@@ -301,7 +327,7 @@ fn convert_transform(transform: gltf::scene::Transform) -> glam::Affine3A {
             scale,
         } => glam::Affine3A::from_scale_rotation_translation(
             scale.into(),
-            glam::Quat::from_array(rotation),
+            glam::Quat::from_xyzw(rotation[0], rotation[1], rotation[2], rotation[3]),
             translation.into(),
         ),
     }
@@ -399,6 +425,7 @@ fn get_material(
     Some(Material {
         id: id.into(),
         base_colour_factor: pbr.base_color_factor().into(),
+        emissive_colour_factor: material.emissive_factor().into(),
         base_colour_texture,
         metallic_roughness_texture,
         normal_texture,
@@ -423,6 +450,7 @@ fn load_material(
 
     let material = GPUMaterial {
         base_colour_factor: material.base_colour_factor,
+        emissive_colour_factor: material.emissive_colour_factor,
         base_colour_texture: get(&material.base_colour_texture),
         normal_texture: get(&material.normal_texture),
         metallic_roughness_texture: get(&material.metallic_roughness_texture),
@@ -532,7 +560,7 @@ fn get_primitive(primitive: gltf::Primitive, blob: &[u8]) -> Option<Primitive> {
         .collect();
 
     Some(Primitive {
-        id: primitive.index().into(),
+        id: PrimitiveID::next(),
         vertices,
         indices,
         material,
@@ -554,10 +582,10 @@ fn load_primitive(
         .device_address;
 
     // Upload the indices
-    let index_buffer_offset = index_buffer.len() as u64;
+    let index_buffer_offset = index_buffer.current_size();
     allocator.append_to_buffer(&primitive.indices, index_buffer);
 
-    println!(
+    log::debug!(
         "[Primitive#{}] Wrote {} indices to [index buffer (device address: {})] at offset {}. First index: {:?}",
         primitive.id,
         primitive.indices.len(),
@@ -567,10 +595,10 @@ fn load_primitive(
     );
 
     // Upload the indices
-    let vertex_buffer_offset = vertex_buffer.len() as u64;
+    let vertex_buffer_offset = vertex_buffer.current_size();
     allocator.append_to_buffer(&primitive.vertices, vertex_buffer);
 
-    println!(
+    log::debug!(
         "[Primitive#{}] Wrote {} vertices to [vertex buffer (device address: {})] at offset {}. First vertex: {:?}",
         primitive.id,
         primitive.vertices.len(),

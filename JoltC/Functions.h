@@ -1063,6 +1063,31 @@ JPC_API void JPC_TriangleShapeSettings_default(JPC_TriangleShapeSettings* object
 JPC_API bool JPC_TriangleShapeSettings_Create(const JPC_TriangleShapeSettings* self, JPC_Shape** outShape, JPC_String** outError);
 
 ////////////////////////////////////////////////////////////////////////////////
+// HeightfieldShapeSettings -> ShapeSettings
+
+typedef struct JPC_HeightfieldShapeSettings {
+	// ShapeSettings
+	uint64_t UserData;
+
+	/// The height field is a surface defined by: mOffset + mScale * (x, mHeightSamples[y * mSampleCount + x], y).
+	/// where x and y are integers in the range x and y e [0, mSampleCount - 1].
+	JPC_Vec3 Offset;
+	JPC_Vec3 Scale;
+	size_t SampleCount;
+	float MinHeightValue;
+	float MaxHeightValue;
+	size_t BlockSize;
+	size_t BitsPerSample;
+	float* HeightSamples;
+	// PhysicsMaterialList				mMaterials;
+
+
+} JPC_HeightfieldShapeSettings;
+
+JPC_API void JPC_HeightfieldShapeSettings_default(JPC_HeightfieldShapeSettings* object);
+JPC_API bool JPC_HeightfieldShapeSettings_Create(const JPC_HeightfieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError);
+
+////////////////////////////////////////////////////////////////////////////////
 // MeshShapeSettings -> ShapeSettings
 
 typedef struct JPC_MeshShapeSettings {
@@ -1082,6 +1107,7 @@ typedef struct JPC_MeshShapeSettings {
 
 JPC_API void JPC_MeshShapeSettings_default(JPC_MeshShapeSettings* object);
 JPC_API bool JPC_MeshShapeSettings_Create(const JPC_MeshShapeSettings* self, JPC_Shape** outShape, JPC_String** outError);
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // BoxShapeSettings -> ConvexShapeSettings -> ShapeSettings
@@ -1180,6 +1206,7 @@ typedef struct JPC_ConvexHullShapeSettings {
 
 JPC_API void JPC_ConvexHullShapeSettings_default(JPC_ConvexHullShapeSettings* object);
 JPC_API bool JPC_ConvexHullShapeSettings_Create(const JPC_ConvexHullShapeSettings* self, JPC_Shape** outShape, JPC_String** outError);
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // CompoundShape::SubShapeSettings

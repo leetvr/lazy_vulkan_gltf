@@ -1737,6 +1737,35 @@ JPC_API bool JPC_TriangleShapeSettings_Create(const JPC_TriangleShapeSettings* s
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// HeighfieldShapeSettings
+
+static void to_jph(const JPC_HeightfieldShapeSettings* input, JPH::HeightFieldShapeSettings* output) {
+	output->mUserData = input->UserData;
+
+	output->mOffset = to_jph(input->Offset);
+}
+
+JPC_API void JPC_ConvexHullShapeSettings_default(JPC_ConvexHullShapeSettings* object) {
+	object->UserData = 0;
+
+	// TODO: Material
+	object->Density = 1000.0;
+
+	object->Points = nullptr;
+	object->PointsLen = 0;
+	object->MaxConvexRadius = 0.0;
+	object->MaxErrorConvexRadius = 0.05f;
+	object->HullTolerance = 1.0e-3f;
+}
+
+JPC_API bool JPC_ConvexHullShapeSettings_Create(const JPC_ConvexHullShapeSettings* self, JPC_Shape** outShape, JPC_String** outError) {
+	JPH::ConvexHullShapeSettings settings;
+	to_jph(self, &settings);
+
+	return HandleShapeResult(settings.Create(), outShape, outError);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MeshShapeSettings
 
 JPC_IMPL void JPC_MeshShapeSettings_to_jpc_borrowed(

@@ -1079,6 +1079,7 @@ typedef struct JPC_HeightFieldShapeSettings {
 	size_t BlockSize;
 	size_t BitsPerSample;
 	float* HeightSamples;
+	float ActiveEdgeCosThresholdAngle;
 	// PhysicsMaterialList				mMaterials;
 
 

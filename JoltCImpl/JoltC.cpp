@@ -1744,17 +1744,41 @@ static void to_jph(const JPC_HeightFieldShapeSettings* input, JPH::HeightFieldSh
 	output->mUserData = input->UserData;
 
 	output->mOffset = to_jph(input->Offset);
+	output->mScale = to_jph(input->Scale);
+
+	// TODO(kr): Should we be copying here or just rewiring the pointers?
+	// Copies the contents of input->HeightSamples into output->mHeightSamples
+	output->mHeightSamples.assign(input->HeightSamples, input->HeightSamples + input->SampleCount);
+	output->mSampleCount = input->SampleCount;
+
+	output->mMinHeightValue = input->MinHeightValue;
+	output->mMaxHeightValue = input->MaxHeightValue;
+	output->mActiveEdgeCosThresholdAngle = input->ActiveEdgeCosThresholdAngle;
+	output->mBitsPerSample = input->BitsPerSample;
+	output->mBlockSize = input->BlockSize;
 }
 
 static void to_jpc(const JPH::HeightFieldShapeSettings* input, JPC_HeightFieldShapeSettings* output) {
 	output->UserData = input->mUserData;
 
 	output->Offset = to_jpc(input->mOffset);
+	output->Scale = to_jpc(input->mScale);
+
+	// Overwrite all pointers and lengths so that the default value doesn't
+	// contain pointers to freed memory.
+	//
+	output->HeightSamples = nullptr;
+	output->SampleCount = input->mSampleCount;
+	output->MinHeightValue = input->mMinHeightValue;
+	output->MaxHeightValue = input->mMaxHeightValue;
+	output->ActiveEdgeCosThresholdAngle = input->mActiveEdgeCosThresholdAngle;
+	output->BitsPerSample = input->mBitsPerSample;
+	output->BlockSize = input->mBlockSize;
 }
 
 JPC_API void JPC_HeightFieldShapeSettings_default(JPC_HeightFieldShapeSettings* object) {
-	auto settings = JPH::HeightFieldShapeSettings();
- to_jpc(&settings, object);
+	JPH::HeightFieldShapeSettings settings;
+	to_jpc(&settings, object);
 }
 
 JPC_API bool JPC_HeightfieldShapeSettings_Create(const JPC_HeightFieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError) {

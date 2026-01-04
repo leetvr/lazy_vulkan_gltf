@@ -1781,7 +1781,7 @@ JPC_API void JPC_HeightFieldShapeSettings_default(JPC_HeightFieldShapeSettings* 
 	to_jpc(&settings, object);
 }
 
-JPC_API bool JPC_HeightfieldShapeSettings_Create(const JPC_HeightFieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError) {
+JPC_API bool JPC_HeightFieldShapeSettings_Create(const JPC_HeightFieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError) {
 	JPH::HeightFieldShapeSettings settings;
 	to_jph(self, &settings);
 

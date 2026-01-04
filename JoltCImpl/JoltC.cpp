@@ -1748,7 +1748,7 @@ static void to_jph(const JPC_HeightFieldShapeSettings* input, JPH::HeightFieldSh
 
 	// TODO(kr): Should we be copying here or just rewiring the pointers?
 	// Copies the contents of input->HeightSamples into output->mHeightSamples
-	output->mHeightSamples.assign(input->HeightSamples, input->HeightSamples + input->SampleCount);
+	output->mHeightSamples.assign(input->HeightSamples, input->HeightSamples + (input->SampleCount * sizeof(float)));
 	output->mSampleCount = input->SampleCount;
 
 	output->mMinHeightValue = input->MinHeightValue;

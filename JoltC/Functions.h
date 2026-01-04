@@ -1065,7 +1065,7 @@ JPC_API bool JPC_TriangleShapeSettings_Create(const JPC_TriangleShapeSettings* s
 ////////////////////////////////////////////////////////////////////////////////
 // HeightfieldShapeSettings -> ShapeSettings
 
-typedef struct JPC_HeightfieldShapeSettings {
+typedef struct JPC_HeightFieldShapeSettings {
 	// ShapeSettings
 	uint64_t UserData;
 
@@ -1082,10 +1082,10 @@ typedef struct JPC_HeightfieldShapeSettings {
 	// PhysicsMaterialList				mMaterials;
 
 
-} JPC_HeightfieldShapeSettings;
+} JPC_HeightFieldShapeSettings;
 
-JPC_API void JPC_HeightfieldShapeSettings_default(JPC_HeightfieldShapeSettings* object);
-JPC_API bool JPC_HeightfieldShapeSettings_Create(const JPC_HeightfieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError);
+JPC_API void JPC_HeightfieldShapeSettings_default(JPC_HeightFieldShapeSettings* object);
+JPC_API bool JPC_HeightfieldShapeSettings_Create(const JPC_HeightFieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError);
 
 ////////////////////////////////////////////////////////////////////////////////
 // MeshShapeSettings -> ShapeSettings

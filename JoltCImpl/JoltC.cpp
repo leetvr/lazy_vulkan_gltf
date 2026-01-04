@@ -20,6 +20,7 @@
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/CylinderShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
 #include <Jolt/Physics/Collision/Shape/MutableCompoundShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
@@ -1739,27 +1740,25 @@ JPC_API bool JPC_TriangleShapeSettings_Create(const JPC_TriangleShapeSettings* s
 ////////////////////////////////////////////////////////////////////////////////
 // HeighfieldShapeSettings
 
-static void to_jph(const JPC_HeightfieldShapeSettings* input, JPH::HeightFieldShapeSettings* output) {
+static void to_jph(const JPC_HeightFieldShapeSettings* input, JPH::HeightFieldShapeSettings* output) {
 	output->mUserData = input->UserData;
 
 	output->mOffset = to_jph(input->Offset);
 }
 
-JPC_API void JPC_ConvexHullShapeSettings_default(JPC_ConvexHullShapeSettings* object) {
-	object->UserData = 0;
+static void to_jpc(const JPH::HeightFieldShapeSettings* input, JPC_HeightFieldShapeSettings* output) {
+	output->UserData = input->mUserData;
 
-	// TODO: Material
-	object->Density = 1000.0;
-
-	object->Points = nullptr;
-	object->PointsLen = 0;
-	object->MaxConvexRadius = 0.0;
-	object->MaxErrorConvexRadius = 0.05f;
-	object->HullTolerance = 1.0e-3f;
+	output->Offset = to_jpc(input->mOffset);
 }
 
-JPC_API bool JPC_ConvexHullShapeSettings_Create(const JPC_ConvexHullShapeSettings* self, JPC_Shape** outShape, JPC_String** outError) {
-	JPH::ConvexHullShapeSettings settings;
+JPC_API void JPC_HeightFieldShapeSettings_default(JPC_HeightFieldShapeSettings* object) {
+	auto settings = JPH::HeightFieldShapeSettings();
+ to_jpc(&settings, object);
+}
+
+JPC_API bool JPC_HeightfieldShapeSettings_Create(const JPC_HeightFieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError) {
+	JPH::HeightFieldShapeSettings settings;
 	to_jph(self, &settings);
 
 	return HandleShapeResult(settings.Create(), outShape, outError);

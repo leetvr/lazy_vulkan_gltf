@@ -1085,8 +1085,8 @@ typedef struct JPC_HeightFieldShapeSettings {
 
 } JPC_HeightFieldShapeSettings;
 
-JPC_API void JPC_HeightfieldShapeSettings_default(JPC_HeightFieldShapeSettings* object);
-JPC_API bool JPC_HeightfieldShapeSettings_Create(const JPC_HeightFieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError);
+JPC_API void JPC_HeightFieldShapeSettings_default(JPC_HeightFieldShapeSettings* object);
+JPC_API bool JPC_HeightFieldShapeSettings_Create(const JPC_HeightFieldShapeSettings* self, JPC_Shape** outShape, JPC_String** outError);
 
 ////////////////////////////////////////////////////////////////////////////////
 // MeshShapeSettings -> ShapeSettings

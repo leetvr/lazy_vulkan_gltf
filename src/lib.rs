@@ -1,9 +1,13 @@
+mod mesh;
+
 use std::{
     collections::HashMap,
     fmt::Display,
     path::Path,
     sync::atomic::{AtomicU32, Ordering},
 };
+
+pub use mesh::{AABB, Mesh, get_mesh, load_mesh};
 
 use lazy_vulkan::{Allocator, BufferAllocation, Image, ImageManager, SlabUpload, ash::vk};
 
@@ -170,12 +174,6 @@ pub struct Node {
     pub mesh_id: MeshID,
     pub children: Vec<NodeID>,
     pub transform: glam::Affine3A,
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct Mesh {
-    pub id: MeshID,
-    pub primitives: Vec<Primitive>,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -346,35 +344,6 @@ fn get_buffer(path: &std::path::Path, document: &gltf::Document) -> Vec<u8> {
     let mut path = path.to_path_buf();
     path.set_file_name(uri);
     std::fs::read(&path).expect(&format!("Failed to load {path:?} for buffer"))
-}
-
-fn get_mesh(mesh: gltf::Mesh, blob: &[u8]) -> Mesh {
-    Mesh {
-        id: MeshID(mesh.index() as _),
-        primitives: mesh
-            .primitives()
-            .filter_map(|p| get_primitive(p, blob))
-            .collect(),
-    }
-}
-
-fn load_mesh(
-    mesh: &Mesh,
-    allocator: &mut Allocator,
-    vertex_buffer: &mut BufferAllocation<Vertex>,
-    index_buffer: &mut BufferAllocation<u32>,
-    loaded_materials: &HashMap<MaterialID, LoadedMaterial>,
-) -> LoadedMesh {
-    let primitives = mesh
-        .primitives
-        .iter()
-        .map(|p| load_primitive(p, allocator, vertex_buffer, index_buffer, loaded_materials))
-        .collect();
-
-    LoadedMesh {
-        id: mesh.id,
-        primitives,
-    }
 }
 
 fn get_material(
@@ -629,6 +598,17 @@ mod tests {
     #[test]
     fn test_get_asset() {
         let asset = get_asset("test_assets/cube.glb").unwrap();
+        assert_eq!(asset.meshes.len(), 1);
+        assert_eq!(asset.meshes[0].primitives.len(), 1);
+        assert_eq!(asset.meshes[0].primitives[0].indices.len(), 2916);
+        assert_eq!(asset.meshes[0].primitives[0].vertices.len(), 681);
+        assert_eq!(asset.materials.len(), 1);
+        assert_eq!(asset.textures.len(), 0);
+    }
+
+    #[test]
+    fn test_get_unit() {
+        let asset = get_asset("test_assets/unit.glb").unwrap();
         assert_eq!(asset.meshes.len(), 1);
         assert_eq!(asset.meshes[0].primitives.len(), 1);
         assert_eq!(asset.meshes[0].primitives[0].indices.len(), 2916);

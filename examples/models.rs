@@ -197,18 +197,12 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
+                state.window.pre_present_notify();
                 state.lazy_vulkan.draw(&());
+                state.window.request_redraw();
             }
             _ => {}
         }
-    }
-
-    fn about_to_wait(&mut self, _: &winit::event_loop::ActiveEventLoop) {
-        let Some(state) = self.state.as_mut() else {
-            return;
-        };
-
-        state.window.request_redraw();
     }
 }
 

@@ -123,6 +123,7 @@ impl From<u32> for TextureID {
 pub struct LoadedAsset {
     pub meshes: Vec<LoadedMesh>,
     pub nodes: Vec<Node>,
+    pub aabb: AABB,
 }
 
 #[derive(Default, Clone)]
@@ -266,16 +267,29 @@ pub fn load_asset(
         .map(|m| load_material(m, allocator, &loaded_textures))
         .collect();
 
-    // Lastly, patch up the meshes to point to the loaded materials and load them in
+    // Next, patch up the meshes to point to the loaded materials and load them in
     let meshes = asset
         .meshes
         .iter()
         .map(|m| load_mesh(m, allocator, vertex_buffer, index_buffer, &loaded_materials))
         .collect();
 
+    // Finally, calculate an AABB for this asset by walking through each node, transforming each
+    // position into the mesh's coordinate space and expanding the AABB accordingly.
+    let mut asset_aabb = AABB::default();
+    for node in &asset.nodes {
+        for primitive in &asset.meshes[usize::from(node.mesh_id)].primitives {
+            for &vertex in &primitive.vertices {
+                asset_aabb
+                    .expand_to_include_point(node.transform.transform_point3(vertex.position));
+            }
+        }
+    }
+
     Ok(LoadedAsset {
         meshes,
         nodes: asset.nodes,
+        aabb: asset_aabb,
     })
 }
 

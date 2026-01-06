@@ -12,7 +12,6 @@ use crate::{
 pub struct Mesh {
     pub id: MeshID,
     pub primitives: Vec<Primitive>,
-    pub aabb: AABB,
 }
 
 pub fn get_mesh(mesh: gltf::Mesh, blob: &[u8]) -> Mesh {
@@ -22,13 +21,7 @@ pub fn get_mesh(mesh: gltf::Mesh, blob: &[u8]) -> Mesh {
         .filter_map(|p| get_primitive(p, blob))
         .collect::<Vec<_>>();
 
-    let aabb = calculate_aabb(&primitives);
-
-    Mesh {
-        id,
-        primitives,
-        aabb,
-    }
+    Mesh { id, primitives }
 }
 
 pub fn load_mesh(
@@ -48,23 +41,6 @@ pub fn load_mesh(
         id: mesh.id,
         primitives,
     }
-}
-
-/// Calculates the local-space axis-aligned bounds over all vertices referenced by the primitives.
-pub fn calculate_aabb(primitives: &[Primitive]) -> AABB {
-    let mut bounds = AABB::default();
-
-    for primitive in primitives {
-        for &vertex_index in &primitive.indices {
-            let Some(vertex) = primitive.vertices.get(vertex_index as usize) else {
-                continue;
-            };
-
-            bounds.expand_to_include_point(vertex.position);
-        }
-    }
-
-    bounds
 }
 
 /// Simple axis aligned bounding box in the mesh's coordinate space
@@ -91,5 +67,10 @@ impl AABB {
     pub fn expand_to_include_point(&mut self, point_in_local_space: Vec3) {
         self.min = self.min.min(point_in_local_space);
         self.max = self.max.max(point_in_local_space);
+    }
+
+    pub fn extend(&mut self, aabb: &AABB) {
+        self.expand_to_include_point(aabb.min);
+        self.expand_to_include_point(aabb.max);
     }
 }

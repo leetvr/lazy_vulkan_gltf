@@ -119,14 +119,14 @@ impl From<u32> for TextureID {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct LoadedAsset {
     pub meshes: Vec<LoadedMesh>,
     pub nodes: Vec<Node>,
     pub aabb: AABB,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct LoadedMesh {
     pub id: MeshID,
     pub primitives: Vec<LoadedPrimitive>,
@@ -151,7 +151,7 @@ impl From<Image> for LoadedTexture {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LoadedPrimitive {
     pub id: PrimitiveID,
     pub index_count: u32,
@@ -280,8 +280,8 @@ pub fn load_asset(
     for node in &asset.nodes {
         for primitive in &asset.meshes[usize::from(node.mesh_id)].primitives {
             for &vertex in &primitive.vertices {
-                asset_aabb
-                    .expand_to_include_point(node.transform.transform_point3(vertex.position));
+                let point_in_local_space = node.transform.transform_point3(vertex.position);
+                asset_aabb.expand_to_include_point(point_in_local_space);
             }
         }
     }
@@ -442,6 +442,11 @@ fn load_material(
 
     // Now let's upload it
     let uploaded = allocator.upload_to_slab(&[material]);
+
+    log::trace!(
+        "Uploaded material {material:?} to {:?}",
+        uploaded.device_address
+    );
 
     (
         id,

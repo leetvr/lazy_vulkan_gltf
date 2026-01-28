@@ -1,7 +1,7 @@
 use std::f32::consts::TAU;
 
 use glam::Quat;
-use lazy_vulkan::{BufferAllocation, LazyVulkan, Pipeline, SubRenderer, ash::vk};
+use lazy_vulkan::{BufferAllocation, LazyVulkan, Pipeline, StateFamily, SubRenderer, ash::vk};
 use lazy_vulkan_gltf::{LoadedAsset, Vertex};
 use winit::{
     application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent,
@@ -11,6 +11,16 @@ use winit::{
 static VERTEX_SHADER_PATH: &'static str = "examples/shaders/main.vert.spv";
 static FRAGMENT_SHADER_PATH: &'static str = "examples/shaders/main.frag.spv";
 
+struct RenderStateFamily;
+
+impl StateFamily for RenderStateFamily {
+    type For<'s> = RenderState;
+}
+
+struct RenderState {
+    extent: vk::Extent2D,
+}
+
 struct ModelRenderer {
     pipeline: Pipeline,
     vertex_buffer: BufferAllocation<Vertex>,
@@ -19,7 +29,7 @@ struct ModelRenderer {
 }
 
 impl ModelRenderer {
-    pub fn new(renderer: &mut lazy_vulkan::Renderer<()>) -> Self {
+    pub fn new(renderer: &mut lazy_vulkan::Renderer<RenderStateFamily>) -> Self {
         let pipeline =
             renderer.create_pipeline::<Registers>(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH);
         let mut vertex_buffer = renderer
@@ -58,19 +68,14 @@ impl ModelRenderer {
 }
 
 impl SubRenderer<'_> for ModelRenderer {
-    type State = ();
+    type State = RenderState;
 
-    fn draw_opaque(
-        &mut self,
-        _state: &Self::State,
-        context: &lazy_vulkan::Context,
-        params: lazy_vulkan::DrawParams,
-    ) {
+    fn draw_opaque(&mut self, state: &Self::State, context: &lazy_vulkan::Context) {
         self.begin_rendering(context, &self.pipeline);
 
         let device = &context.device;
         let command_buffer = context.draw_command_buffer;
-        let mvp = build_mvp(params.drawable.extent);
+        let mvp = build_mvp(state.extent);
 
         for model in &self.models {
             for node in &model.asset.nodes {
@@ -153,7 +158,7 @@ fn build_mvp(extent: vk::Extent2D) -> glam::Mat4 {
 
 struct AppState {
     window: winit::window::Window,
-    lazy_vulkan: LazyVulkan<()>,
+    lazy_vulkan: LazyVulkan<RenderStateFamily>,
 }
 
 #[derive(Default)]
@@ -198,7 +203,12 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 state.window.pre_present_notify();
-                state.lazy_vulkan.draw(&());
+                state.lazy_vulkan.draw(&RenderState {
+                    extent: vk::Extent2D {
+                        width: state.window.inner_size().width,
+                        height: state.window.inner_size().height,
+                    },
+                });
                 state.window.request_redraw();
             }
             _ => {}

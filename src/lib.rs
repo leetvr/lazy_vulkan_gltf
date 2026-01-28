@@ -511,6 +511,7 @@ fn load_texture(
     image_manager: &mut ImageManager,
 ) -> (TextureID, LoadedTexture) {
     let image = image_manager.create_image(
+        format!("glTF Texture [#{}]", texture.id.0),
         allocator,
         texture.format,
         texture.extent,

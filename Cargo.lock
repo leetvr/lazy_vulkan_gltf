@@ -701,7 +701,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 [[package]]
 name = "lazy_vulkan"
 version = "0.1.0"
-source = "git+https://github.com/leetvr/lazy_vulkan.git?rev=9772609#9772609ccb1f689f70fe186b78c33afc2c1b11de"
+source = "git+https://github.com/leetvr/lazy_vulkan.git?rev=6c259f4#6c259f4fd026a3c63f6652f4aec52646613759dc"
 dependencies = [
  "ash",
  "ash-window",

@@ -22,6 +22,24 @@ impl From<usize> for MaterialID {
     }
 }
 
+impl From<MaterialID> for usize {
+    fn from(value: MaterialID) -> Self {
+        value.0 as usize
+    }
+}
+
+impl From<MaterialID> for u32 {
+    fn from(value: MaterialID) -> Self {
+        value.0
+    }
+}
+
+impl PartialEq<usize> for MaterialID {
+    fn eq(&self, other: &usize) -> bool {
+        self.0 as usize == *other
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq, Eq, Copy, Hash)]
 pub struct MeshID(u32);
 
@@ -107,6 +125,12 @@ impl PartialEq<usize> for TextureID {
     }
 }
 
+impl PartialEq<u32> for TextureID {
+    fn eq(&self, other: &u32) -> bool {
+        *other == self.0
+    }
+}
+
 impl PartialEq<TextureID> for usize {
     fn eq(&self, other: &TextureID) -> bool {
         *other == TextureID::from(*self)
@@ -116,6 +140,18 @@ impl PartialEq<TextureID> for usize {
 impl From<u32> for TextureID {
     fn from(value: u32) -> Self {
         TextureID(value)
+    }
+}
+
+impl From<TextureID> for u32 {
+    fn from(value: TextureID) -> Self {
+        value.0
+    }
+}
+
+impl From<TextureID> for usize {
+    fn from(value: TextureID) -> Self {
+        value.0 as usize
     }
 }
 
@@ -167,6 +203,55 @@ pub struct Asset {
     pub materials: Vec<Material>,
     pub textures: Vec<Texture>,
     pub nodes: Vec<Node>,
+}
+
+impl Asset {
+    pub fn load(
+        &self,
+        allocator: &mut Allocator,
+        image_manager: &mut ImageManager,
+        index_buffer: &mut BufferAllocation<u32>,
+        vertex_buffer: &mut BufferAllocation<Vertex>,
+    ) -> Result<LoadedAsset, gltf::Error> {
+        // First, load in all our textures
+        let loaded_textures = self
+            .textures
+            .iter()
+            .map(|t| load_texture(t, allocator, image_manager))
+            .collect();
+
+        // Then, patch up the materials to point to the loaded textures and load them in
+        let loaded_materials = self
+            .materials
+            .iter()
+            .map(|m| load_material(m, allocator, &loaded_textures))
+            .collect();
+
+        // Next, patch up the meshes to point to the loaded materials and load them in
+        let meshes = self
+            .meshes
+            .iter()
+            .map(|m| load_mesh(m, allocator, vertex_buffer, index_buffer, &loaded_materials))
+            .collect();
+
+        // Finally, calculate an AABB for this asset by walking through each node, transforming each
+        // position into the mesh's coordinate space and expanding the AABB accordingly.
+        let mut asset_aabb = AABB::default();
+        for node in &self.nodes {
+            for primitive in &self.meshes[usize::from(node.mesh_id)].primitives {
+                for &vertex in &primitive.vertices {
+                    let point_in_local_space = node.transform.transform_point3(vertex.position);
+                    asset_aabb.expand_to_include_point(point_in_local_space);
+                }
+            }
+        }
+
+        Ok(LoadedAsset {
+            meshes,
+            nodes: self.nodes.clone(),
+            aabb: asset_aabb,
+        })
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -252,45 +337,7 @@ pub fn load_asset(
     vertex_buffer: &mut BufferAllocation<Vertex>,
 ) -> Result<LoadedAsset, gltf::Error> {
     let asset = get_asset(path)?;
-
-    // First, load in all our textures
-    let loaded_textures = asset
-        .textures
-        .iter()
-        .map(|t| load_texture(t, allocator, image_manager))
-        .collect();
-
-    // Then, patch up the materials to point to the loaded textures and load them in
-    let loaded_materials = asset
-        .materials
-        .iter()
-        .map(|m| load_material(m, allocator, &loaded_textures))
-        .collect();
-
-    // Next, patch up the meshes to point to the loaded materials and load them in
-    let meshes = asset
-        .meshes
-        .iter()
-        .map(|m| load_mesh(m, allocator, vertex_buffer, index_buffer, &loaded_materials))
-        .collect();
-
-    // Finally, calculate an AABB for this asset by walking through each node, transforming each
-    // position into the mesh's coordinate space and expanding the AABB accordingly.
-    let mut asset_aabb = AABB::default();
-    for node in &asset.nodes {
-        for primitive in &asset.meshes[usize::from(node.mesh_id)].primitives {
-            for &vertex in &primitive.vertices {
-                let point_in_local_space = node.transform.transform_point3(vertex.position);
-                asset_aabb.expand_to_include_point(point_in_local_space);
-            }
-        }
-    }
-
-    Ok(LoadedAsset {
-        meshes,
-        nodes: asset.nodes,
-        aabb: asset_aabb,
-    })
+    asset.load(allocator, image_manager, index_buffer, vertex_buffer)
 }
 
 pub fn get_asset(path: impl AsRef<Path>) -> Result<Asset, gltf::Error> {

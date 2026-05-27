@@ -8,8 +8,10 @@ use winit::{
     window::WindowAttributes,
 };
 
-static VERTEX_SHADER_PATH: &'static str = "examples/shaders/main.vert.spv";
-static FRAGMENT_SHADER_PATH: &'static str = "examples/shaders/main.frag.spv";
+static VERTEX_SHADER_SOURCE_PATH: &str = "examples/shaders/main.vert.slang";
+static FRAGMENT_SHADER_SOURCE_PATH: &str = "examples/shaders/main.frag.slang";
+static VERTEX_SHADER_PATH: &str = "examples/shaders/main.vert.spv";
+static FRAGMENT_SHADER_PATH: &str = "examples/shaders/main.frag.spv";
 
 struct RenderStateFamily;
 
@@ -217,25 +219,64 @@ impl ApplicationHandler for App {
 }
 
 fn compile_shaders() {
-    let _ = std::process::Command::new("glslc")
-        .arg("examples/shaders/main.vert")
-        .arg("-g")
-        .arg("-o")
-        .arg(VERTEX_SHADER_PATH)
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+    use shader_slang as slang;
 
-    let _ = std::process::Command::new("glslc")
-        .arg("examples/shaders/main.frag")
-        .arg("-g")
-        .arg("-o")
-        .arg(FRAGMENT_SHADER_PATH)
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+    let global_session = slang::GlobalSession::new().unwrap();
+    let shader_search_path = std::ffi::CString::new("examples/shaders/").unwrap();
+
+    let session_options = slang::CompilerOptions::default()
+        .language(slang::SourceLanguage::Slang)
+        .optimization(slang::OptimizationLevel::None)
+        .debug_information(slang::DebugInfoLevel::Standard)
+        .glsl_force_scalar_layout(true)
+        .matrix_layout_row(true)
+        .vulkan_use_entry_point_name(true)
+        .emit_spirv_directly(true);
+
+    let target_desc = slang::TargetDesc::default()
+        .format(slang::CompileTarget::Spirv)
+        .profile(global_session.find_profile("spirv_1_6"));
+
+    let targets = [target_desc];
+    let search_paths = [shader_search_path.as_ptr()];
+    let session_desc = slang::SessionDesc::default()
+        .targets(&targets)
+        .search_paths(&search_paths)
+        .options(&session_options);
+
+    let session = global_session.create_session(&session_desc).unwrap();
+
+    compile_shader(&session, VERTEX_SHADER_SOURCE_PATH, VERTEX_SHADER_PATH);
+    compile_shader(&session, FRAGMENT_SHADER_SOURCE_PATH, FRAGMENT_SHADER_PATH);
+}
+
+fn compile_shader(session: &shader_slang::Session, source_path: &str, output_path: &str) {
+    let module = session
+        .load_module(source_path)
+        .unwrap_or_else(|err| panic!("failed to load {source_path}: {err}"));
+    let entry_point = module
+        .find_entry_point_by_name("main")
+        .unwrap_or_else(|| panic!("failed to find main in {source_path}"));
+    let program = session
+        .create_composite_component_type(&[module.clone().into(), entry_point.into()])
+        .unwrap_or_else(|err| panic!("failed to create Slang program for {source_path}: {err}"));
+    let linked_program = program
+        .link()
+        .unwrap_or_else(|err| panic!("failed to link {source_path}: {err}"));
+    let shader_bytecode = linked_program
+        .entry_point_code(0, 0)
+        .unwrap_or_else(|err| panic!("failed to emit SPIR-V for {source_path}: {err}"));
+
+    std::fs::write(output_path, shader_bytecode.as_slice())
+        .unwrap_or_else(|err| panic!("failed to write {output_path}: {err}"));
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn compiles_slang_shaders() {
+        super::compile_shaders();
+    }
 }
 
 pub fn main() {
